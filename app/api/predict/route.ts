@@ -23,14 +23,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error calling Python API:", error)
     
-    // Fallback to mock prediction if Python API is not available
-    console.log("Falling back to mock prediction...")
-    const mockPrediction = {
-      mal_pagador: Math.random() > 0.5,
-      probabilidad: Math.random()
-    }
-    
-    return NextResponse.json(mockPrediction)
+    return NextResponse.json(
+      { 
+        error: "Error al obtener predicción de morosidad." 
+      }, 
+      { status: 503 }
+    )
   }
 }
 
