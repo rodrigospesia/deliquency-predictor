@@ -1,0 +1,680 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, AlertTriangle, CheckCircle, Building2, User, Briefcase, MapPin, TrendingUp, Phone, Users, FileText, DollarSign } from 'lucide-react'
+
+interface CustomerData {
+  Edad: number
+  Trabaja: number
+  Ingreso: number
+  Antiguedad_Meses: number
+  Genero: number
+  EstadoCivil: number
+  TipoPatrono: number // Add this new field
+  Vive_GAM: number
+  CantidadTelefonos: number
+  CantidadHijos: number
+  Hacienda_Inscrito: number
+  Provincia_SAN_JOSE: boolean
+  Provincia_ALAJUELA: boolean
+  Provincia_CARTAGO: boolean
+  Provincia_HEREDIA: boolean
+  Provincia_GUANACASTE: boolean
+  Provincia_PUNTARENAS: boolean
+  Provincia_LIMON: boolean
+  nivel_ingreso: number
+  riesgo_despido: number
+  movilidad_social: number
+  trabajo_fisico: number
+}
+
+const ColorSlider = ({
+  value,
+  onValueChange,
+  labels,
+  title,
+  icon: Icon,
+  isPositive = false, // New prop to indicate if higher values are better
+}: {
+  value: number[]
+  onValueChange: (value: number[]) => void
+  labels: string[]
+  title: string
+  icon: React.ElementType
+  isPositive?: boolean // Add this prop
+}) => {
+  const getSliderColor = (val: number) => {
+    if (isPositive) {
+      // For positive metrics (income level, social mobility) - higher is better
+      const colors = [
+        "bg-red-600", // 1 - Muy Bajo/Baja (bad)
+        "bg-red-400", // 2 - Bajo/Baja (bad)
+        "bg-orange-400", // 3 - Medio/Media (neutral)
+        "bg-yellow-400", // 4 - Alto/Alta (good)
+        "bg-green-500", // 5 - Muy Alto/Muy Alta (very good)
+      ]
+      return colors[val - 1] || colors[0]
+    } else {
+      // For risk metrics - lower is better
+      const colors = [
+        "bg-green-500", // 1 - Muy Bajo (good)
+        "bg-yellow-400", // 2 - Bajo (ok)
+        "bg-orange-400", // 3 - Medio (neutral)
+        "bg-red-400", // 4 - Alto (bad)
+        "bg-red-600", // 5 - Muy Alto (very bad)
+      ]
+      return colors[val - 1] || colors[0]
+    }
+  }
+
+  const getTextColor = (val: number) => {
+    if (isPositive) {
+      // For positive metrics
+      const colors = [
+        "text-red-700", // 1
+        "text-red-600", // 2
+        "text-orange-700", // 3
+        "text-yellow-700", // 4
+        "text-green-700", // 5
+      ]
+      return colors[val - 1] || colors[0]
+    } else {
+      // For risk metrics
+      const colors = [
+        "text-green-700", // 1
+        "text-yellow-700", // 2
+        "text-orange-700", // 3
+        "text-red-600", // 4
+        "text-red-700", // 5
+      ]
+      return colors[val - 1] || colors[0]
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center space-x-2">
+        <Icon className="h-4 w-4 text-gray-600" />
+        <Label className="text-sm font-medium">{title}</Label>
+      </div>
+      <div className="px-3">
+        <Slider value={value} onValueChange={onValueChange} max={5} min={1} step={1} className="w-full" />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>1</span>
+          <span>2</span>
+          <span>3</span>
+          <span>4</span>
+          <span>5</span>
+        </div>
+      </div>
+      <div className={`text-center p-2 rounded-md ${getSliderColor(value[0])} bg-opacity-20`}>
+        <span className={`font-semibold ${getTextColor(value[0])}`}>{labels[value[0] - 1]}</span>
+      </div>
+    </div>
+  )
+}
+
+export default function PredictorMorosidadCostaRica() {
+  const [formData, setFormData] = useState<CustomerData>({
+    Edad: 0,
+    Trabaja: 0,
+    Ingreso: 0,
+    Antiguedad_Meses: 0,
+    Genero: 0,
+    EstadoCivil: 0,
+    TipoPatrono: 0, // Add this line
+    Vive_GAM: 0,
+    CantidadTelefonos: 0,
+    CantidadHijos: 0,
+    Hacienda_Inscrito: 0,
+    Provincia_SAN_JOSE: false,
+    Provincia_ALAJUELA: false,
+    Provincia_CARTAGO: false,
+    Provincia_HEREDIA: false,
+    Provincia_GUANACASTE: false,
+    Provincia_PUNTARENAS: false,
+    Provincia_LIMON: false,
+    nivel_ingreso: 3,
+    riesgo_despido: 3,
+    movilidad_social: 3,
+    trabajo_fisico: 0,
+  })
+
+  const [selectedProvince, setSelectedProvince] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [prediction, setPrediction] = useState<boolean | null>(null)
+  const [error, setError] = useState<string>("")
+
+  const provinces = [
+    { value: "SAN_JOSE", label: "San José" },
+    { value: "ALAJUELA", label: "Alajuela" },
+    { value: "CARTAGO", label: "Cartago" },
+    { value: "HEREDIA", label: "Heredia" },
+    { value: "GUANACASTE", label: "Guanacaste" },
+    { value: "PUNTARENAS", label: "Puntarenas" },
+    { value: "LIMON", label: "Limón" },
+  ]
+
+  const incomeLabels = ["Muy Bajo", "Bajo", "Medio", "Alto", "Muy Alto"]
+  const riskLabels = ["Muy Bajo", "Bajo", "Medio", "Alto", "Muy Alto"]
+  const mobilityLabels = ["Muy Baja", "Baja", "Media", "Alta", "Muy Alta"]
+
+  // Auto-determine GAM based on province selection
+  useEffect(() => {
+    if (selectedProvince === "SAN_JOSE") {
+      setFormData((prev) => ({ ...prev, Vive_GAM: 1 }))
+    } else if (selectedProvince) {
+      setFormData((prev) => ({ ...prev, Vive_GAM: 0 }))
+    }
+  }, [selectedProvince])
+
+  const handleInputChange = (field: keyof CustomerData, value: string | number) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: typeof value === "string" ? Number.parseInt(value) || 0 : value,
+    }))
+  }
+
+  const handleProvinceChange = (province: string) => {
+    setSelectedProvince(province)
+    // Reset all provinces to false
+    const updatedData = { ...formData }
+    provinces.forEach((p) => {
+      updatedData[`Provincia_${p.value}` as keyof CustomerData] = false as any
+    })
+    // Set selected province to true
+    if (province) {
+      updatedData[`Provincia_${province}` as keyof CustomerData] = true as any
+    }
+    setFormData(updatedData)
+  }
+
+  const formatCurrency = (value: string) => {
+    const number = value.replace(/\D/g, "")
+    return number.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  }
+
+  const handleIncomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value)
+    const numericValue = Number.parseInt(formatted.replace(/,/g, "")) || 0
+    setFormData((prev) => ({ ...prev, Ingreso: numericValue }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+    setPrediction(null)
+
+    try {
+      const response = await fetch("/api/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al obtener la predicción")
+      }
+
+      const result = await response.json()
+      setPrediction(result.prediction)
+    } catch (err) {
+      setError("Error al procesar la predicción. Por favor, inténtelo de nuevo.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <Building2 className="h-16 w-16 text-blue-600 mr-4" />
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Sistema de Evaluación Crediticia</h1>
+              <p className="text-lg text-gray-600">Predicción de Riesgo de Morosidad - Costa Rica</p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Personal Information */}
+            <Card className="shadow-lg border-0">
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
+                <CardTitle className="flex items-center">
+                  <User className="mr-2 h-5 w-5" />
+                  Información Personal
+                </CardTitle>
+                <CardDescription className="text-blue-100">Datos básicos del cliente</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="age" className="flex items-center text-sm font-medium">
+                      <User className="mr-1 h-3 w-3" />
+                      Edad
+                    </Label>
+                    <Input
+                      id="age"
+                      type="number"
+                      min="18"
+                      max="100"
+                      value={formData.Edad === 0 ? "" : formData.Edad}
+                      onChange={(e) => handleInputChange("Edad", e.target.value)}
+                      className="mt-1"
+                      placeholder="Ej: 35"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="flex items-center text-sm font-medium">
+                      <Users className="mr-1 h-3 w-3" />
+                      Género
+                    </Label>
+                    <Select
+                      value={formData.Genero.toString()}
+                      onValueChange={(value) => handleInputChange("Genero", Number.parseInt(value))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Masculino</SelectItem>
+                        <SelectItem value="1">Femenino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <Users className="mr-1 h-3 w-3" />
+                    Estado Civil
+                  </Label>
+                  <Select
+                    value={formData.EstadoCivil.toString()}
+                    onValueChange={(value) => handleInputChange("EstadoCivil", Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Soltero(a)</SelectItem>
+                      <SelectItem value="1">Casado(a)</SelectItem>
+                      <SelectItem value="2">Divorciado(a)</SelectItem>
+                      <SelectItem value="3">Viudo(a)</SelectItem>
+                      <SelectItem value="4">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="children" className="flex items-center text-sm font-medium">
+                    <Users className="mr-1 h-3 w-3" />
+                    Cantidad de Hijos
+                  </Label>
+                  <Input
+                    id="children"
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={formData.CantidadHijos}
+                    onChange={(e) => handleInputChange("CantidadHijos", e.target.value)}
+                    className="mt-1"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="phones" className="flex items-center text-sm font-medium">
+                    <Phone className="mr-1 h-3 w-3" />
+                    Cantidad de Teléfonos
+                  </Label>
+                  <Input
+                    id="phones"
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={formData.CantidadTelefonos}
+                    onChange={(e) => handleInputChange("CantidadTelefonos", e.target.value)}
+                    className="mt-1"
+                    placeholder="0"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Employment Information */}
+            <Card className="shadow-lg border-0">
+              <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
+                <CardTitle className="flex items-center">
+                  <Briefcase className="mr-2 h-5 w-5" />
+                  Información Laboral
+                </CardTitle>
+                <CardDescription className="text-green-100">Detalles de empleo e ingresos</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <Briefcase className="mr-1 h-3 w-3" />
+                    ¿Trabaja Actualmente?
+                  </Label>
+                  <Select
+                    value={formData.Trabaja.toString()}
+                    onValueChange={(value) => handleInputChange("Trabaja", Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No</SelectItem>
+                      <SelectItem value="1">Sí</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="income" className="flex items-center text-sm font-medium">
+                    <DollarSign className="mr-1 h-3 w-3" />
+                    Ingresos Mensuales
+                  </Label>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                      ₡
+                    </span>
+                    <Input
+                      id="income"
+                      type="text"
+                      value={formData.Ingreso === 0 ? "0" : formatCurrency(formData.Ingreso.toString())}
+                      onChange={handleIncomeChange}
+                      className="pl-8"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="tenure" className="flex items-center text-sm font-medium">
+                    <FileText className="mr-1 h-3 w-3" />
+                    Antigüedad Laboral (Meses)
+                  </Label>
+                  <Input
+                    id="tenure"
+                    type="number"
+                    min="0"
+                    value={formData.Antiguedad_Meses}
+                    onChange={(e) => handleInputChange("Antiguedad_Meses", e.target.value)}
+                    className="mt-1"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <Briefcase className="mr-1 h-3 w-3" />
+                    ¿Trabajo Físico?
+                  </Label>
+                  <Select
+                    value={formData.trabajo_fisico.toString()}
+                    onValueChange={(value) => handleInputChange("trabajo_fisico", Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No</SelectItem>
+                      <SelectItem value="1">Sí</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <Building2 className="mr-1 h-3 w-3" />
+                    Tipo Patrono
+                  </Label>
+                  <Select
+                    value={formData.TipoPatrono.toString()}
+                    onValueChange={(value) => handleInputChange("TipoPatrono", Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Independiente</SelectItem>
+                      <SelectItem value="1">Privado</SelectItem>
+                      <SelectItem value="2">ATV</SelectItem>
+                      <SelectItem value="3">Gobierno</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Location Information */}
+            <Card className="shadow-lg border-0">
+              <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-t-lg">
+                <CardTitle className="flex items-center">
+                  <MapPin className="mr-2 h-5 w-5" />
+                  Información de Ubicación
+                </CardTitle>
+                <CardDescription className="text-purple-100">Datos geográficos y fiscales</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
+                <div>
+                  <Label htmlFor="province" className="flex items-center text-sm font-medium">
+                    <MapPin className="mr-1 h-3 w-3" />
+                    Provincia
+                  </Label>
+                  <Select value={selectedProvince} onValueChange={handleProvinceChange}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar provincia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {provinces.map((province) => (
+                        <SelectItem key={province.value} value={province.value}>
+                          {province.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <MapPin className="mr-1 h-3 w-3" />
+                    Vive en Área GAM
+                  </Label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                    <span className={`font-medium ${formData.Vive_GAM ? "text-green-600" : "text-gray-600"}`}>
+                      {formData.Vive_GAM ? "Sí" : "No"}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {selectedProvince === "SAN_JOSE"
+                        ? "Automáticamente establecido como 'Sí' para San José"
+                        : "Automáticamente establecido basado en la provincia"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="flex items-center text-sm font-medium">
+                    <FileText className="mr-1 h-3 w-3" />
+                    ¿Inscrito en Hacienda?
+                  </Label>
+                  <Select
+                    value={formData.Hacienda_Inscrito.toString()}
+                    onValueChange={(value) => handleInputChange("Hacienda_Inscrito", Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No</SelectItem>
+                      <SelectItem value="1">Sí</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Risk Assessment Sliders */}
+          <Card className="shadow-lg border-0">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-t-lg">
+              <CardTitle className="flex items-center">
+                <TrendingUp className="mr-2 h-5 w-5" />
+                Evaluación de Factores de Riesgo
+              </CardTitle>
+              <CardDescription className="text-orange-100">Deslice para ajustar los niveles de riesgo</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <ColorSlider
+                  value={[formData.nivel_ingreso]}
+                  onValueChange={(value) => handleInputChange("nivel_ingreso", value[0])}
+                  labels={incomeLabels}
+                  title="Nivel de Ingresos"
+                  icon={DollarSign}
+                  isPositive={true} // Higher income is better (green)
+                />
+
+                <ColorSlider
+                  value={[formData.riesgo_despido]}
+                  onValueChange={(value) => handleInputChange("riesgo_despido", value[0])}
+                  labels={riskLabels}
+                  title="Riesgo de Despido"
+                  icon={AlertTriangle}
+                  isPositive={false} // Higher risk is worse (red)
+                />
+
+                <ColorSlider
+                  value={[formData.movilidad_social]}
+                  onValueChange={(value) => handleInputChange("movilidad_social", value[0])}
+                  labels={mobilityLabels}
+                  title="Movilidad Social"
+                  icon={TrendingUp}
+                  isPositive={true} // Higher mobility is better (green)
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-center">
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isLoading}
+              className="w-full max-w-md bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-8 rounded-lg shadow-lg transform transition hover:scale-105"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Analizando Riesgo...
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="mr-2 h-5 w-5" />
+                  Evaluar Riesgo de Morosidad
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+
+        {/* Results */}
+        {error && (
+          <Alert variant="destructive" className="mt-6 shadow-lg">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {prediction !== null && (
+          <Card className="mt-6 shadow-xl border-0">
+            <CardHeader
+              className={`${prediction ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"} text-white rounded-t-lg`}
+            >
+              <CardTitle className="flex items-center text-xl">
+                {prediction ? (
+                  <>
+                    <AlertTriangle className="h-8 w-8 mr-3" />
+                    Resultado: ALTO RIESGO
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-8 w-8 mr-3" />
+                    Resultado: BAJO RIESGO
+                  </>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div
+                className={`p-6 rounded-lg border-2 ${prediction ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}
+              >
+                <div className="flex items-start space-x-4">
+                  <div className={`p-3 rounded-full ${prediction ? "bg-red-100" : "bg-green-100"}`}>
+                    {prediction ? (
+                      <AlertTriangle className="h-8 w-8 text-red-600" />
+                    ) : (
+                      <CheckCircle className="h-8 w-8 text-green-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className={`text-xl font-bold mb-2 ${prediction ? "text-red-800" : "text-green-800"}`}>
+                      {prediction
+                        ? "Cliente con ALTA probabilidad de morosidad"
+                        : "Cliente con BAJA probabilidad de morosidad"}
+                    </h3>
+                    <p className={`text-base mb-4 ${prediction ? "text-red-700" : "text-green-700"}`}>
+                      {prediction
+                        ? "Este perfil presenta factores de riesgo significativos que sugieren una alta probabilidad de incumplimiento en los pagos."
+                        : "Este perfil presenta características favorables que indican una baja probabilidad de incumplimiento en los pagos."}
+                    </p>
+                    <div className={`p-4 rounded-md ${prediction ? "bg-red-100" : "bg-green-100"}`}>
+                      <h4 className={`font-semibold mb-2 ${prediction ? "text-red-800" : "text-green-800"}`}>
+                        Recomendaciones:
+                      </h4>
+                      <ul className={`text-sm space-y-1 ${prediction ? "text-red-700" : "text-green-700"}`}>
+                        {prediction ? (
+                          <>
+                            <li>• Solicitar garantías adicionales o avales</li>
+                            <li>• Considerar un monto de crédito reducido</li>
+                            <li>• Implementar seguimiento más frecuente</li>
+                            <li>• Evaluar condiciones especiales de pago</li>
+                          </>
+                        ) : (
+                          <>
+                            <li>• Cliente apto para condiciones estándar</li>
+                            <li>• Considerar para productos preferenciales</li>
+                            <li>• Seguimiento rutinario recomendado</li>
+                            <li>• Perfil adecuado para líneas de crédito</li>
+                          </>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
