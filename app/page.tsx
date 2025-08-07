@@ -14,27 +14,25 @@ import { Loader2, AlertTriangle, CheckCircle, Building2, User, Briefcase, MapPin
 
 interface CustomerData {
   Edad: number
-  Trabaja: number
-  Ingreso: number
-  Antiguedad_Meses: number
   Genero: number
   EstadoCivil: number
-  TipoPatrono: number // Add this new field
-  Vive_GAM: number
-  CantidadTelefonos: number
   CantidadHijos: number
-  Hacienda_Inscrito: number
-  Provincia_SAN_JOSE: boolean
-  Provincia_ALAJUELA: boolean
-  Provincia_CARTAGO: boolean
-  Provincia_HEREDIA: boolean
-  Provincia_GUANACASTE: boolean
-  Provincia_PUNTARENAS: boolean
-  Provincia_LIMON: boolean
+  CantidadTelefonos: number
+  Trabaja: boolean
+  Ingreso: number
+  Antiguedad_Meses: number
+  Trabajo_Fisico: boolean
+  Provincia: number
+  Patrono: number
+  Hacienda_Inscrito: boolean
   nivel_ingreso: number
   riesgo_despido: number
   movilidad_social: number
-  trabajo_fisico: number
+}
+
+interface PredictionResponse {
+  mal_pagador: boolean
+  probabilidad: number
 }
 
 const ColorSlider = ({
@@ -126,76 +124,57 @@ const ColorSlider = ({
 export default function PredictorMorosidadCostaRica() {
   const [formData, setFormData] = useState<CustomerData>({
     Edad: 0,
-    Trabaja: 0,
+    Genero: 1,
+    EstadoCivil: 1,
+    CantidadHijos: 0,
+    CantidadTelefonos: 1,
+    Trabaja: false,
     Ingreso: 0,
     Antiguedad_Meses: 0,
-    Genero: 0,
-    EstadoCivil: 0,
-    TipoPatrono: 0, // Add this line
-    Vive_GAM: 0,
-    CantidadTelefonos: 0,
-    CantidadHijos: 0,
-    Hacienda_Inscrito: 0,
-    Provincia_SAN_JOSE: false,
-    Provincia_ALAJUELA: false,
-    Provincia_CARTAGO: false,
-    Provincia_HEREDIA: false,
-    Provincia_GUANACASTE: false,
-    Provincia_PUNTARENAS: false,
-    Provincia_LIMON: false,
+    Trabajo_Fisico: false,
+    Provincia: 1,
+    Patrono: 1,
+    Hacienda_Inscrito: false,
     nivel_ingreso: 3,
     riesgo_despido: 3,
     movilidad_social: 3,
-    trabajo_fisico: 0,
   })
 
-  const [selectedProvince, setSelectedProvince] = useState<string>("")
+  const [selectedProvince, setSelectedProvince] = useState<string>("1")
   const [isLoading, setIsLoading] = useState(false)
-  const [prediction, setPrediction] = useState<boolean | null>(null)
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
   const [error, setError] = useState<string>("")
 
   const provinces = [
-    { value: "SAN_JOSE", label: "San José" },
-    { value: "ALAJUELA", label: "Alajuela" },
-    { value: "CARTAGO", label: "Cartago" },
-    { value: "HEREDIA", label: "Heredia" },
-    { value: "GUANACASTE", label: "Guanacaste" },
-    { value: "PUNTARENAS", label: "Puntarenas" },
-    { value: "LIMON", label: "Limón" },
+    { value: "1", label: "San José" },
+    { value: "2", label: "Alajuela" },
+    { value: "3", label: "Cartago" },
+    { value: "4", label: "Heredia" },
+    { value: "5", label: "Guanacaste" },
+    { value: "6", label: "Puntarenas" },
+    { value: "7", label: "Limón" },
   ]
 
   const incomeLabels = ["Muy Bajo", "Bajo", "Medio", "Alto", "Muy Alto"]
   const riskLabels = ["Muy Bajo", "Bajo", "Medio", "Alto", "Muy Alto"]
   const mobilityLabels = ["Muy Baja", "Baja", "Media", "Alta", "Muy Alta"]
 
-  // Auto-determine GAM based on province selection
+  // Update provincia when selectedProvince changes
   useEffect(() => {
-    if (selectedProvince === "SAN_JOSE") {
-      setFormData((prev) => ({ ...prev, Vive_GAM: 1 }))
-    } else if (selectedProvince) {
-      setFormData((prev) => ({ ...prev, Vive_GAM: 0 }))
+    if (selectedProvince) {
+      setFormData((prev) => ({ ...prev, Provincia: parseInt(selectedProvince) }))
     }
   }, [selectedProvince])
 
-  const handleInputChange = (field: keyof CustomerData, value: string | number) => {
+  const handleInputChange = (field: keyof CustomerData, value: string | number | boolean) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: typeof value === "string" ? Number.parseInt(value) || 0 : value,
+      [field]: typeof value === "string" ? (field === 'Trabaja' || field === 'Trabajo_Fisico' || field === 'Hacienda_Inscrito' ? value === 'true' : Number.parseInt(value) || 0) : value,
     }))
   }
 
   const handleProvinceChange = (province: string) => {
     setSelectedProvince(province)
-    // Reset all provinces to false
-    const updatedData = { ...formData }
-    provinces.forEach((p) => {
-      updatedData[`Provincia_${p.value}` as keyof CustomerData] = false as any
-    })
-    // Set selected province to true
-    if (province) {
-      updatedData[`Provincia_${province}` as keyof CustomerData] = true as any
-    }
-    setFormData(updatedData)
   }
 
   const formatCurrency = (value: string) => {
@@ -229,7 +208,7 @@ export default function PredictorMorosidadCostaRica() {
       }
 
       const result = await response.json()
-      setPrediction(result.prediction)
+      setPrediction(result)
     } catch (err) {
       setError("Error al procesar la predicción. Por favor, inténtelo de nuevo.")
     } finally {
@@ -293,8 +272,8 @@ export default function PredictorMorosidadCostaRica() {
                         <SelectValue placeholder="Seleccionar" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0">Masculino</SelectItem>
-                        <SelectItem value="1">Femenino</SelectItem>
+                        <SelectItem value="1">Masculino</SelectItem>
+                        <SelectItem value="2">Femenino</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -305,21 +284,23 @@ export default function PredictorMorosidadCostaRica() {
                     <Users className="mr-1 h-3 w-3" />
                     Estado Civil
                   </Label>
-                  <Select
-                    value={formData.EstadoCivil.toString()}
-                    onValueChange={(value) => handleInputChange("EstadoCivil", Number.parseInt(value))}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Soltero(a)</SelectItem>
-                      <SelectItem value="1">Casado(a)</SelectItem>
-                      <SelectItem value="2">Divorciado(a)</SelectItem>
-                      <SelectItem value="3">Viudo(a)</SelectItem>
-                      <SelectItem value="4">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                                      <Select
+                      value={formData.EstadoCivil.toString()}
+                      onValueChange={(value) => handleInputChange("EstadoCivil", Number.parseInt(value))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Soltero(a)</SelectItem>
+                        <SelectItem value="2">Casado(a)</SelectItem>
+                        <SelectItem value="3">Divorciado(a)</SelectItem>
+                        <SelectItem value="4">Viudo(a)</SelectItem>
+                        <SelectItem value="5">Reconciliación Judicial</SelectItem>
+                        <SelectItem value="6">Separación Judicial</SelectItem>
+                        <SelectItem value="7">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
                 </div>
 
                 <div>
@@ -375,14 +356,14 @@ export default function PredictorMorosidadCostaRica() {
                   </Label>
                   <Select
                     value={formData.Trabaja.toString()}
-                    onValueChange={(value) => handleInputChange("Trabaja", Number.parseInt(value))}
+                    onValueChange={(value) => handleInputChange("Trabaja", value === 'true')}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">No</SelectItem>
-                      <SelectItem value="1">Sí</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Sí</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -429,15 +410,15 @@ export default function PredictorMorosidadCostaRica() {
                     ¿Trabajo Físico?
                   </Label>
                   <Select
-                    value={formData.trabajo_fisico.toString()}
-                    onValueChange={(value) => handleInputChange("trabajo_fisico", Number.parseInt(value))}
+                    value={formData.Trabajo_Fisico.toString()}
+                    onValueChange={(value) => handleInputChange("Trabajo_Fisico", value === 'true')}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">No</SelectItem>
-                      <SelectItem value="1">Sí</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Sí</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -448,17 +429,17 @@ export default function PredictorMorosidadCostaRica() {
                     Tipo Patrono
                   </Label>
                   <Select
-                    value={formData.TipoPatrono.toString()}
-                    onValueChange={(value) => handleInputChange("TipoPatrono", Number.parseInt(value))}
+                    value={formData.Patrono.toString()}
+                    onValueChange={(value) => handleInputChange("Patrono", Number.parseInt(value))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">Independiente</SelectItem>
-                      <SelectItem value="1">Privado</SelectItem>
-                      <SelectItem value="2">ATV</SelectItem>
-                      <SelectItem value="3">Gobierno</SelectItem>
+                      <SelectItem value="1">ATV</SelectItem>
+                      <SelectItem value="2">Gobierno</SelectItem>
+                      <SelectItem value="3">Independiente</SelectItem>
+                      <SelectItem value="4">Privado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -494,22 +475,7 @@ export default function PredictorMorosidadCostaRica() {
                   </Select>
                 </div>
 
-                <div>
-                  <Label className="flex items-center text-sm font-medium">
-                    <MapPin className="mr-1 h-3 w-3" />
-                    Vive en Área GAM
-                  </Label>
-                  <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                    <span className={`font-medium ${formData.Vive_GAM ? "text-green-600" : "text-gray-600"}`}>
-                      {formData.Vive_GAM ? "Sí" : "No"}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {selectedProvince === "SAN_JOSE"
-                        ? "Automáticamente establecido como 'Sí' para San José"
-                        : "Automáticamente establecido basado en la provincia"}
-                    </p>
-                  </div>
-                </div>
+
 
                 <div>
                   <Label className="flex items-center text-sm font-medium">
@@ -518,14 +484,14 @@ export default function PredictorMorosidadCostaRica() {
                   </Label>
                   <Select
                     value={formData.Hacienda_Inscrito.toString()}
-                    onValueChange={(value) => handleInputChange("Hacienda_Inscrito", Number.parseInt(value))}
+                    onValueChange={(value) => handleInputChange("Hacienda_Inscrito", value === 'true')}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">No</SelectItem>
-                      <SelectItem value="1">Sí</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Sí</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -607,10 +573,10 @@ export default function PredictorMorosidadCostaRica() {
         {prediction !== null && (
           <Card className="mt-6 shadow-xl border-0">
             <CardHeader
-              className={`${prediction ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"} text-white rounded-t-lg`}
+              className={`${prediction.mal_pagador ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"} text-white rounded-t-lg`}
             >
               <CardTitle className="flex items-center text-xl">
-                {prediction ? (
+                {prediction.mal_pagador ? (
                   <>
                     <AlertTriangle className="h-8 w-8 mr-3" />
                     Resultado: ALTO RIESGO
@@ -625,33 +591,40 @@ export default function PredictorMorosidadCostaRica() {
             </CardHeader>
             <CardContent className="p-6">
               <div
-                className={`p-6 rounded-lg border-2 ${prediction ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}
+                className={`p-6 rounded-lg border-2 ${prediction.mal_pagador ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}
               >
                 <div className="flex items-start space-x-4">
-                  <div className={`p-3 rounded-full ${prediction ? "bg-red-100" : "bg-green-100"}`}>
-                    {prediction ? (
+                  <div className={`p-3 rounded-full ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
+                    {prediction.mal_pagador ? (
                       <AlertTriangle className="h-8 w-8 text-red-600" />
                     ) : (
                       <CheckCircle className="h-8 w-8 text-green-600" />
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className={`text-xl font-bold mb-2 ${prediction ? "text-red-800" : "text-green-800"}`}>
-                      {prediction
+                    <h3 className={`text-xl font-bold mb-2 ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
+                      {prediction.mal_pagador
                         ? "Cliente con ALTA probabilidad de morosidad"
                         : "Cliente con BAJA probabilidad de morosidad"}
                     </h3>
-                    <p className={`text-base mb-4 ${prediction ? "text-red-700" : "text-green-700"}`}>
-                      {prediction
-                        ? "Este perfil presenta factores de riesgo significativos que sugieren una alta probabilidad de incumplimiento en los pagos."
-                        : "Este perfil presenta características favorables que indican una baja probabilidad de incumplimiento en los pagos."}
-                    </p>
-                    <div className={`p-4 rounded-md ${prediction ? "bg-red-100" : "bg-green-100"}`}>
-                      <h4 className={`font-semibold mb-2 ${prediction ? "text-red-800" : "text-green-800"}`}>
+                    <div className="mb-4">
+                      <p className={`text-base mb-2 ${prediction.mal_pagador ? "text-red-700" : "text-green-700"}`}>
+                        {prediction.mal_pagador
+                          ? "Este perfil presenta factores de riesgo significativos que sugieren una alta probabilidad de incumplimiento en los pagos."
+                          : "Este perfil presenta características favorables que indican una baja probabilidad de incumplimiento en los pagos."}
+                      </p>
+                      <div className={`p-3 rounded-md ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
+                        <span className={`text-sm font-medium ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
+                          Probabilidad de morosidad: {(prediction.probabilidad * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-md ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
+                      <h4 className={`font-semibold mb-2 ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
                         Recomendaciones:
                       </h4>
-                      <ul className={`text-sm space-y-1 ${prediction ? "text-red-700" : "text-green-700"}`}>
-                        {prediction ? (
+                      <ul className={`text-sm space-y-1 ${prediction.mal_pagador ? "text-red-700" : "text-green-700"}`}>
+                        {prediction.mal_pagador ? (
                           <>
                             <li>• Solicitar garantías adicionales o avales</li>
                             <li>• Considerar un monto de crédito reducido</li>
