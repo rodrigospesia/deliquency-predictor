@@ -570,83 +570,118 @@ export default function PredictorMorosidadCostaRica() {
           </Alert>
         )}
 
-        {prediction !== null && (
-          <Card className="mt-6 shadow-xl border-0">
-            <CardHeader
-              className={`${prediction.mal_pagador ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"} text-white rounded-t-lg`}
-            >
-              <CardTitle className="flex items-center text-xl">
-                {prediction.mal_pagador ? (
-                  <>
+        {prediction !== null && (() => {
+          const probPct = prediction.probabilidad * 100
+          const isLow = probPct < 20
+          const isMedium = probPct >= 20 && probPct <= 50
+          const isHigh = probPct > 50
+
+          const headerBg = isHigh
+            ? "bg-gradient-to-r from-red-500 to-red-600"
+            : isMedium
+            ? "bg-gradient-to-r from-yellow-500 to-yellow-600"
+            : "bg-gradient-to-r from-green-500 to-green-600"
+
+          const panelBg = isHigh
+            ? "bg-red-50 border-red-200"
+            : isMedium
+            ? "bg-yellow-50 border-yellow-200"
+            : "bg-green-50 border-green-200"
+
+          const badgeBg = isHigh
+            ? "bg-red-100"
+            : isMedium
+            ? "bg-yellow-100"
+            : "bg-green-100"
+
+          const textColor = isHigh
+            ? "text-red-800"
+            : isMedium
+            ? "text-yellow-800"
+            : "text-green-800"
+
+          const subTextColor = isHigh
+            ? "text-red-700"
+            : isMedium
+            ? "text-yellow-700"
+            : "text-green-700"
+
+          const title = isHigh
+            ? "Resultado: ALTA probabilidad de morosidad"
+            : isMedium
+            ? "Resultado: MEDIA probabilidad de morosidad"
+            : "Resultado: BAJA probabilidad de morosidad"
+
+          return (
+            <Card className="mt-6 shadow-xl border-0">
+              <CardHeader className={`${headerBg} text-white rounded-t-lg`}>
+                <CardTitle className="flex items-center text-xl">
+                  {isHigh ? (
                     <AlertTriangle className="h-8 w-8 mr-3" />
-                    Resultado: ALTO RIESGO
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <CheckCircle className="h-8 w-8 mr-3" />
-                    Resultado: BAJO RIESGO
-                  </>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div
-                className={`p-6 rounded-lg border-2 ${prediction.mal_pagador ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`p-3 rounded-full ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
-                    {prediction.mal_pagador ? (
-                      <AlertTriangle className="h-8 w-8 text-red-600" />
-                    ) : (
-                      <CheckCircle className="h-8 w-8 text-green-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className={`text-xl font-bold mb-2 ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
-                      {prediction.mal_pagador
-                        ? "Cliente con ALTA probabilidad de morosidad"
-                        : "Cliente con BAJA probabilidad de morosidad"}
-                    </h3>
-                    <div className="mb-4">
-                      <p className={`text-base mb-2 ${prediction.mal_pagador ? "text-red-700" : "text-green-700"}`}>
-                        {prediction.mal_pagador
-                          ? "Este perfil presenta factores de riesgo significativos que sugieren una alta probabilidad de incumplimiento en los pagos."
-                          : "Este perfil presenta características favorables que indican una baja probabilidad de incumplimiento en los pagos."}
-                      </p>
-                      <div className={`p-3 rounded-md ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
-                        <span className={`text-sm font-medium ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
-                          Probabilidad de morosidad: {(prediction.probabilidad * 100).toFixed(2)}%
-                        </span>
-                      </div>
+                  )}
+                  {title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className={`p-6 rounded-lg border-2 ${panelBg}`}>
+                  <div className="flex items-start space-x-4">
+                    <div className={`p-3 rounded-full ${badgeBg}`}>
+                      {isHigh ? (
+                        <AlertTriangle className="h-8 w-8 text-red-600" />
+                      ) : isMedium ? (
+                        <AlertTriangle className="h-8 w-8 text-yellow-600" />
+                      ) : (
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                      )}
                     </div>
-                    <div className={`p-4 rounded-md ${prediction.mal_pagador ? "bg-red-100" : "bg-green-100"}`}>
-                      <h4 className={`font-semibold mb-2 ${prediction.mal_pagador ? "text-red-800" : "text-green-800"}`}>
-                        Recomendaciones:
-                      </h4>
-                      <ul className={`text-sm space-y-1 ${prediction.mal_pagador ? "text-red-700" : "text-green-700"}`}>
-                        {prediction.mal_pagador ? (
-                          <>
-                            <li>• Solicitar garantías adicionales o avales</li>
-                            <li>• Considerar un monto de crédito reducido</li>
-                            <li>• Implementar seguimiento más frecuente</li>
-                            <li>• Evaluar condiciones especiales de pago</li>
-                          </>
-                        ) : (
-                          <>
-                            <li>• Cliente apto para condiciones estándar</li>
-                            <li>• Considerar para productos preferenciales</li>
-                            <li>• Seguimiento rutinario recomendado</li>
-                            <li>• Perfil adecuado para líneas de crédito</li>
-                          </>
-                        )}
-                      </ul>
+                    <div className="flex-1">
+                      <h3 className={`text-xl font-bold mb-2 ${textColor}`}>
+                        {title}
+                      </h3>
+                      <div className="mb-4">
+                        <p className={`text-base mb-2 ${subTextColor}`}>
+                          Probabilidad de morosidad: {probPct.toFixed(2)}%
+                        </p>
+                        <div className={`p-3 rounded-md ${badgeBg}`}>
+                          <span className={`text-sm font-medium ${textColor}`}>
+                            Interpretación basada en el umbral seleccionado.
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`p-4 rounded-md ${badgeBg}`}>
+                        <h4 className={`font-semibold mb-2 ${textColor}`}>Recomendaciones:</h4>
+                        <ul className={`text-sm space-y-1 ${subTextColor}`}>
+                          {isHigh ? (
+                            <>
+                              <li>• Solicitar garantías adicionales o avales</li>
+                              <li>• Considerar un monto de crédito reducido</li>
+                              <li>• Implementar seguimiento más frecuente</li>
+                              <li>• Evaluar condiciones especiales de pago</li>
+                            </>
+                          ) : isMedium ? (
+                            <>
+                              <li>• Evaluación adicional recomendada</li>
+                              <li>• Considerar condiciones de pago moderadas</li>
+                              <li>• Seguimiento periódico</li>
+                            </>
+                          ) : (
+                            <>
+                              <li>• Cliente apto para condiciones estándar</li>
+                              <li>• Considerar para productos preferenciales</li>
+                              <li>• Seguimiento rutinario recomendado</li>
+                            </>
+                          )}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          )
+        })()}
       </div>
     </div>
   )
