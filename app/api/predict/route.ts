@@ -4,8 +4,19 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
 
-    // Call the Python API running on localhost:5000
-    const pythonApiResponse = await fetch("http://localhost:5000/predict", {
+    // Determine API endpoint based on environment
+    const isLocal = process.env.NODE_ENV === 'development' || 
+                   process.env.VERCEL_ENV === 'development' || 
+                   !process.env.VERCEL_URL
+    
+    const apiUrl = isLocal 
+      ? "http://localhost:8080/predict"
+      : "https://predictor-api-y2tcpa.fly.dev/predict"
+
+    console.log(`Using API endpoint: ${apiUrl}`)
+
+    // Call the Python API
+    const pythonApiResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
